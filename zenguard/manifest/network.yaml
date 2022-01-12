@@ -1,0 +1,29 @@
+apiVersion: zenguard.io/v1alpha
+kind: WGNetwork
+metadata:
+  name: net1
+spec:
+  network:
+    CIDR: 192.168.0.0/24
+    reservedRange: 192.168.0.10-192.168.0.20
+    reservedIPs:
+      - 192.168.0.20
+      - 192.168.0.22
+  server:
+    IPAddress: 192.168.0.1
+    port: 51822
+    additionalRoutes: "0.0.0.0/0"
+    # secret: <SecretName>
+    injectPodCIDR: false
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu : "200m"
+      limits:
+        memory: "128Mi"
+        cpu: "500m"
+  service:
+    #type: NodePort LoadBalancer or NodePort or ClusterIP
+    #port: 30007
+    #nodeAddress: 10.20.0.7
+    type: LoadBalancer

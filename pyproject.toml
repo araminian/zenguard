@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "zenguard"
+version = "0.1.0"
+description = ""
+authors = ["Your Name <you@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+kubernetes = "^21.7.0"
+kopf = "^1.35.3"
+pymongo = "^4.0.1"
+netaddr = "^0.8.0"
+donna25519 = "^0.1.1"
+pydantic = "^1.9.0"
+ipaddr = "^2.2.0"
+configparser = "^5.2.0"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

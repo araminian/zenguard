@@ -1,0 +1,122 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: wgnetworks.zenguard.io
+spec:
+  scope: Namespaced
+  group: zenguard.io
+  names:
+    kind: WGNetwork
+    plural: wgnetworks
+    singular: wgnetwork
+    shortNames:
+      - wgn
+      - wgns
+  versions:
+    - name: v1alpha
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              x-kubernetes-preserve-unknown-fields: true
+            status:
+              type: object
+              x-kubernetes-preserve-unknown-fields: true
+
+---
+
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: wgclients.zenguard.io
+spec:
+  scope: Namespaced
+  group: zenguard.io
+  names:
+    kind: WGClient
+    plural: wgclients
+    singular: wgclient
+    shortNames:
+      - wgc
+      - wgcs
+  versions:
+    - name: v1alpha
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              x-kubernetes-preserve-unknown-fields: true
+              properties:
+                network:
+                  type: object
+                  properties:
+                    CIDR:
+                      type: string
+                    reservedRange:
+                      type: string
+                    reservedIPs:
+                      type: string
+                  required:
+                    - CIDR
+                server:
+                  type: object
+                  required:
+                  - IPAddress
+                  - port
+                  properties:
+                    IPAddress:
+                      type: string
+                    port:
+                      type: integer
+                      minimum: 1
+                      maximum: 65535
+                    additionalRoutes:
+                      type: string
+                    secret:
+                      type: string
+                    injectPodCIDR:
+                      type: boolean
+                      default: false
+                    resources:
+                      type: object
+                      properties:
+                        requests:
+                          type: object
+                          properties:
+                            memory:
+                              type: string
+                            cpu:
+                              type: string
+                        limits:
+                          type: object
+                          properties:
+                            memory:
+                              type: string
+                            cpu:
+                              type: string
+                service:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                    port:
+                      type: integer
+                      minimum: 1
+                      maximum: 65535
+                  required:
+                    - type
+              required:
+              - network
+              - server
+              - service
+            status:
+              type: object
+              x-kubernetes-preserve-unknown-fields: true

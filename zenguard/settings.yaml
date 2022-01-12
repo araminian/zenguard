@@ -1,0 +1,5 @@
+MongoDB:
+  Connection:
+    User: MongoDB_User
+    Password: MongoDB_Password
+    Addresss: MongoDB_Address
