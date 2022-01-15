@@ -674,7 +674,27 @@ def create_wgclient_fn(spec, name, namespace, logger, **kwargs):
         'privateKey': serverKeys['privateKey']
     }
 
+    # -------------------- Add client info to Database ---------------------------------------
+    clientAddResult = add_entry_one(database_name=networkNamespace,table_name='clients',data=clientInfo)
+
+    if(type(clientAddResult) == dict and 'ErrorMsg' in clientAddResult):
+        raise kopf.PermanentError(clientAddResult['ErrorMsg'])
+
+    # -------------------- Client Information for generationg Server and client wg configs -------------------
+
+    clientInfoWGClient = {
+        'name': name,
+        'privateKey': clientKeys[0],
+        'IPAddress': requestedIP
+    }
+
+    clientInfoWGServer = getClients(networkNamespace)
+    if(type(clientInfoWGServer) == dict and 'ErrorMsg' in clientInfoWGServer):
+        raise kopf.PermanentError(clientInfoWGServer['ErrorMsg'])
     
+    
+
+
 
 
 
