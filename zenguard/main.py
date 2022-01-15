@@ -13,6 +13,7 @@ from kubernetes import client
 from kubernetes.client.rest import ApiException
 from zenguard.utils.nacl.security import *
 from zenguard.utils.report.network import *
+from zenguard.utils.k8s.update import *
 import tempfile
 from zenguard.utils.wireguard.generator import serverGenerate
 from pathlib import Path
@@ -688,11 +689,67 @@ def create_wgclient_fn(spec, name, namespace, logger, **kwargs):
         'IPAddress': requestedIP
     }
 
-    clientInfoWGServer = getClients(networkNamespace)
-    if(type(clientInfoWGServer) == dict and 'ErrorMsg' in clientInfoWGServer):
-        raise kopf.PermanentError(clientInfoWGServer['ErrorMsg'])
+    clientsInfoWGServer = getClients(networkNamespace)
+    if(type(clientsInfoWGServer) == dict and 'ErrorMsg' in clientsInfoWGServer):
+        raise kopf.PermanentError(clientsInfoWGServer['ErrorMsg'])
     
+    # ------------------------ Generate WG Configs --------------------------------------
+
+    wgRevision = int(serverConfigs['wgRevision'])
+    updateWGRevition = wgRevision + 1
+
+    wgConfigTempDir = tempfile.TemporaryDirectory(dir="/tmp")
+
+    ## Generate Server WG Configs
+    serverGenerate(clients=clientsInfoWGServer,server=serverInfoWGServer,subnet=subnet,outputDir=wgConfigTempDir.name,networkName=network)
+    wgServerConfigPath = "{0}/wg-server.conf".format(wgConfigTempDir.name)
+    if not Path(wgServerConfigPath).is_file():
+        raise kopf.PermanentError("Server WireGuard configuration file could not be generated")
+    wgServerConfig = open(wgServerConfigPath, "r")
+
+    ## Generate Server WG Config ConfigMap
+    v1API = client.CoreV1Api()
+    wgServerConfigMapMetadata = client.V1ObjectMeta(
+        namespace=namespace,
+        name = "zg-wg-{0}-{1}".format(name,updateWGRevition),
+        labels={
+            'manager': 'zenguard',
+            'network': name,
+            'type': 'wgConfig',
+            'usedBy': 'server',
+            'isLatest': 'true',
+            'version': str(updateWGRevition)
+        }
+    )
+    wgServerConfigurationData = {'wg0.conf': wgServerConfig.read() }
+    wgServerConfigMapObject = client.V1ConfigMap(
+        api_version='v1',kind='ConfigMap',data=wgServerConfigurationData,metadata=wgServerConfigMapMetadata
+    )
+
+    try:
+        serverConfigMapManifest = v1API.create_namespaced_config_map(namespace=namespace,body=wgServerConfigMapObject)
+    except client.exceptions.ApiException as e:
+        logger.error("Could not create server wireguard configuration configMap")
+        raise kopf.PermanentError(e.reason)
     
+    ## Update Server ConfigMaps
+    serverConfigs['wgRevision'] = str(updateWGRevition)
+    serverConfigPathResult = patchConfigMap(
+        configMapName="zg-serverconfigs-{0}".format(network),
+        namespace=namespace,
+        newData=serverConfigs
+    )
+    if(type(serverConfigPathResult) == dict):
+        raise kopf.PermanentError(serverConfigPathResult['ErrorMsg'])
+    
+
+    ## Generate Client WG config
+    
+
+
+
+
+
 
 
 
