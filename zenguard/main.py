@@ -6,6 +6,7 @@ from kubernetes.client.models.v1_config_map_volume_source import V1ConfigMapVolu
 from kubernetes.client.models.v1_security_context import V1SecurityContext
 from pymongo import server
 from zenguard.utils.report.network import *
+from zenguard.utils.report.k8s import *
 from zenguard.utils.nacl.IPUtils import *
 import kopf
 from kubernetes import client
@@ -575,11 +576,37 @@ def create_wgclient_fn(spec, name, namespace, logger, **kwargs):
     if(Linter):
         raise kopf.PermanentError('Lint failed')
     
+
+    # ---------------------- Get an IP address for the Client ---------------------------
+    requestedIP = requestIP(
+        Network=networkNamespace,
+        clientName=name,
+        IP=ip
+    )
+    
+    if(type(requestedIP) == dict):
+        logger.error("ERROR : {0}".format(requestedIP['ErrorMsg']))    
+        raise kopf.PermanentError("Can't request IP for client")
+    # --------------------- Read zg-serverconfigs-[net] configmap ----------------------
+    
+    serverConfigs = readConfigMap(
+        configMapName="zg-serverconfigs-{0}".format(network),
+        namespace=namespace
+    )
+
+    if ('ErrorCode' in serverConfigs):
+        returnIP(Network=networkNamespace,clientName=name)
+        raise kopf.TemporaryError(serverConfigs['ErrorMsg'])
+    
+    # ----------------------------------------------------------------------------------
+
     # Client Secret
     clientKeys = None
     if ('secret' not in spec):
         clientKeys = generateEDKeyPairs()
     # TODO: Implement Secret
+
+
 
 
 @kopf.on.delete('wwgnetworks.zenguard.io')
