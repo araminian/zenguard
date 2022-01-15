@@ -598,7 +598,20 @@ def create_wgclient_fn(spec, name, namespace, logger, **kwargs):
         returnIP(Network=networkNamespace,clientName=name)
         raise kopf.TemporaryError(serverConfigs['ErrorMsg'])
     
-    # ----------------------------------------------------------------------------------
+    # ---------------------Specify Client route---------------------------
+
+    clientRoute = serverConfigs['routes']
+    routesSpec = spec.get('routes')
+    additionalRoutesSpec = spec.get('additionalRoutes')
+    ## routeSpec has more priority
+    if (additionalRoutesSpec):
+        clientRoute = "{0},{1}".format(serverConfigs['routes'],additionalRoutesSpec)
+    if (routesSpec):
+        clientRoute = routesSpec
+    # --------------------------------------------------------------------
+
+
+
 
     # Client Secret
     clientKeys = None
