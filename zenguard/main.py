@@ -536,6 +536,13 @@ def create_wgclient_fn(spec, name, namespace, logger, **kwargs):
         raise kopf.PermanentError("Can't access database")
 
     subnetInfo = list(subnetInfo['Enteries'])[0]
+    subnetReport = getNetworkReport(networkNamespace)
+    if ip:
+       if subnetReport['NumFreeStaticIPs'] == 0:
+           raise kopf.PermanentError("Not enough reserved IP address to assign")
+    else:
+       if subnetReport['NumFreeNonStaticIPs'] == 0:
+           raise kopf.PermanentError("Not enough IP address to assign")
 
     if ip:
     ## Check IP is valid
