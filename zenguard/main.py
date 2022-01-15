@@ -259,7 +259,7 @@ def create_wgnetwork_fn(spec, name, namespace, logger, **kwargs):
             'type': 'keys',
             'usedBy': 'server'
         })
-    serverKeysData = {"PrivateKey":serverInfo['privateKey'],"PublicKey":serverInfo['publicKey']}
+    serverKeysData = {"privateKey":serverInfo['privateKey'],"publicKey":serverInfo['publicKey']}
     serverSecretObject = client.V1Secret(api_version='v1',kind='Secret',metadata=serverSecretMetadata,type='Opaque',data=serverKeysData)
     kopf.adopt(serverSecretObject)
     try:
@@ -608,16 +608,75 @@ def create_wgclient_fn(spec, name, namespace, logger, **kwargs):
         clientRoute = "{0},{1}".format(serverConfigs['routes'],additionalRoutesSpec)
     if (routesSpec):
         clientRoute = routesSpec
-    # --------------------------------------------------------------------
+    # ----------------------Handle Client Secret -----------------------------
 
-
-
-
-    # Client Secret
     clientKeys = None
     if ('secret' not in spec):
         clientKeys = generateEDKeyPairs()
     # TODO: Implement Secret
+
+    # --------------------- Client Info ---------------------------------------
+
+    clientInfo = {
+        "_id": get_sha2(name),
+        "name": name,
+        "privateKey": clientKeys[0],
+        "publicKey" : clientKeys[1],
+        "IPAddress" : requestedIP,
+        "routes" : clientRoute
+
+    }
+
+    # -------------------- Create Server and Subnet dicts for generate WG configs ---------------------------------
+
+    ## Read Server Secret
+    serverKeys = readSecret(
+        secretName="zg-serverkeys-{0}".format(network),
+        namespace=namespace
+    )
+
+    if ('ErrorCode' in serverKeys):
+        returnIP(Network=networkNamespace,clientName=name)
+        raise kopf.TemporaryError(serverKeys['ErrorMsg'])
+
+    ## Server Public IP Address
+    if ( serverConfigs['serviceType' == 'LoadBalancer']):
+        serverPublicIP = getLoadBalancerIP(
+            loadBalancerName="zg-wg-{0}".format(network),
+            namespace=namespace
+        )
+        if ('ErrorCode' in serverPublicIP):
+            returnIP(Network=networkNamespace,clientName=name)
+            raise kopf.TemporaryError(serverPublicIP['ErrorMsg'])
+    else:
+        serverPublicIP = serverConfigs['publicIPAddress']
+    
+    ## Server Port
+    serverPort = serverConfigs['port']
+    if ( serverConfigs['serviceType'] == 'NodePort'):
+        serverPort = serverConfigs['nodePort']
+
+    ## SubnetInfo
+    subnet = {}
+    subnet['mask'] = str(IPNetwork(serverConfigs['CIDR']).netmask)
+
+    ## ServerInfo for generating client wg config
+    serverInfoWGClient = {
+        'publicKey': serverKeys['publicKey'],
+        'publicIPAddress': serverPublicIP,
+        'port': serverPort
+    }
+
+    ## ServerInfo for generating server wg config
+    serverInfoWGServer = {
+        'IPAddress': serverConfigs['IPAddress'],
+        'port': serverConfigs['port'],
+        'privateKey': serverKeys['privateKey']
+    }
+
+    
+
+
 
 
 
