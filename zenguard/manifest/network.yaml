@@ -4,15 +4,15 @@ metadata:
   name: net1
 spec:
   network:
-    CIDR: 192.168.0.0/24
-    reservedRange: 192.168.0.10-192.168.0.20
+    CIDR: 192.168.66.0/24
+    reservedRange: 192.168.66.10-192.168.66.20
     reservedIPs:
-      - 192.168.0.20
-      - 192.168.0.22
+      - 192.168.66.20
+      - 192.168.66.22
   server:
-    IPAddress: 192.168.0.1
+    IPAddress: 192.168.66.1
     port: 51822
-    additionalRoutes: "0.0.0.0/0"
+    #additionalRoutes: "0.0.0.0/0"
     # secret: <SecretName>
     injectPodCIDR: false
     resources:

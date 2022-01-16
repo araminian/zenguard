@@ -1,9 +1,10 @@
-apiVersion: zengaurd.io/v1alpha
+apiVersion: zenguard.io/v1alpha
 kind: WGClient
 metadata:
   name: client1
 spec:
   network: net1
-  IPAddress: 192.168.0.11
+  #IPAddress: 192.168.0.11
   #secret: <>
   #routes:
+  #additionalRoutes:
