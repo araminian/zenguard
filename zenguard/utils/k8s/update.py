@@ -15,14 +15,14 @@ def patchConfigMap(configMapName: str,namespace: str,newData: dict)-> Union[bool
         return {"ErrorCode":'601',"ErrorMsg": "Can not patch configMap {0} , reason {1}".format(configMapName,e.reason)}
     return True
 
-def patchDeployment(deploymentName:str,namepsace:str,newBody:client.V1Deployment)->Union[dict,bool]:
+def patchDeployment(deploymentName:str,namespace:str,newBody:client.V1Deployment)->Union[dict,bool]:
 
     appsV1 = client.AppsV1Api()
 
     try:
         appsV1.patch_namespaced_deployment(
     name=deploymentName,
-    namespace=namepsace,
+    namespace=namespace,
     body=newBody
     )
     except client.exceptions.ApiException as e:
