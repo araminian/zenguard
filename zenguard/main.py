@@ -289,7 +289,6 @@ def create_wgnetwork_fn(spec, name, namespace, logger, **kwargs):
             'network': name,
             'type': 'wgConfig',
             'usedBy': 'server',
-            'isLatest': 'true',
             'version': '1'
         }
     )
@@ -717,7 +716,6 @@ def create_wgclient_fn(spec, name, namespace, logger, **kwargs):
             'network': name,
             'type': 'wgConfig',
             'usedBy': 'server',
-            'isLatest': 'true',
             'version': str(updateWGRevition)
         }
     )
