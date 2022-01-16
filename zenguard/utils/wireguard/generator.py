@@ -18,7 +18,6 @@ def clientGenerate(clients,server,subnet,outputDir):
         # TODO do we need listenport for client ? 
         clientInterface = wg_models.InterfaceModel (
         PrivateKey = wg_models.KeyModel(Key=client['privateKey']),
-        ListenPort = 51820,
         CommentKey = "Interface" ,
         CommentValue = client['name'],
         Address = "{0}/{1}".format(client['IPAddress'],serverMask)
@@ -83,7 +82,8 @@ def generate_interface(interface: wg_models.InterfaceModel):
     commentKey = "# {0} ".format(interface.CommentKey)
     interfaceDict [commentKey] = interface.CommentValue
     interfaceDict ['Address'] = interface.Address
-    interfaceDict ['ListenPort'] = interface.ListenPort
+    if (interface.ListenPort != None):
+        interfaceDict ['ListenPort'] = interface.ListenPort
     interfaceDict ['PrivateKey'] = interface.PrivateKey.Key
     
     
