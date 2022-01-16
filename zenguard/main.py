@@ -1,5 +1,6 @@
 
 from re import template
+from tkinter.font import names
 from kopf._core.actions.execution import no_extra_context
 from kubernetes.client.models.v1_capabilities import V1Capabilities
 from kubernetes.client.models.v1_config_map_volume_source import V1ConfigMapVolumeSource
@@ -309,7 +310,7 @@ def create_wgnetwork_fn(spec, name, namespace, logger, **kwargs):
 
     serverDeploymentMetadata = client.V1ObjectMeta(
         namespace=namespace,
-        generate_name = "zg-{0}-server-".format(name),
+        name = "zg-{0}-server".format(name),
         labels={
             'manager': 'zenguard',
             'network': name,
@@ -778,7 +779,27 @@ def create_wgclient_fn(spec, name, namespace, logger, **kwargs):
 
     logger.info("Client WireGuard configuration is generated to ConfigMap zg-wg-client-{0}".format(name))
 
+    # ------------------- Update Server Deployment ---------------------------------
+
+    serverDeployment = getDeploymentObject(
+        deploymentName="zg-{0}-server".format(network),
+        namespace=namespace
+    )
+
+    if(type(serverDeployment) == dict and 'ErrorCode' in serverDeployment):
+
+        raise kopf.PermanentError("Could not get server deployment")
     
+    serverDeployment.spec.template.spec.volumes[0].config_map.name = "zg-wg-{0}-{1}".format(name,updateWGRevition)
+
+    patchResult = patchDeployment(
+        deploymentName="zg-{0}-server".format(network),
+        namespace=namespace,
+        newBody=serverDeployment
+    )
+
+    if (type(patchResult) == dict and "ErrorCode" in patchResult):
+        raise kopf.PermanentError("Could not update server deployment to use new WireGuard configuartion")
     
 
 
