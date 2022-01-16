@@ -15,7 +15,7 @@ from zenguard.utils.nacl.security import *
 from zenguard.utils.report.network import *
 from zenguard.utils.k8s.update import *
 import tempfile
-from zenguard.utils.wireguard.generator import serverGenerate
+from zenguard.utils.wireguard.generator import clientGenerate, serverGenerate
 from pathlib import Path
 
 @kopf.on.create('wgnetworks.zenguard.io')
@@ -742,7 +742,45 @@ def create_wgclient_fn(spec, name, namespace, logger, **kwargs):
     
 
     ## Generate Client WG config
+    clientGenerate(clients=[clientInfoWGClient],server=serverInfoWGClient,
+    subnet=subnet,outputDir=wgConfigTempDir.name)
+    wgClientConfigPath = "{0}/wg-{1}.conf".format(wgConfigTempDir.name,name)
+    if not Path(wgClientConfigPath).is_file():
+        raise kopf.PermanentError("Client WireGuard configuration file could not be generated")
+    wgClientConfig = open(wgServerConfigPath, "r")
+
+    ### Generate client WG ConfigMap
+
+    wgClientConfigMapMetadata = client.V1ObjectMeta(
+        namespace=namespace,
+        name = "zg-wg-client-{0}".format(name),
+        labels={
+            'manager': 'zenguard',
+            'network': network,
+            'type': 'wgConfig',
+            'usedBy': 'client',
+            'client': name
+        }
+    )
+    wgClientConfigurationData = {'wg0.conf': wgClientConfig.read() }
+    wgClientConfigMapObject = client.V1ConfigMap(
+        api_version='v1',kind='ConfigMap',data=wgClientConfigurationData,metadata=wgClientConfigMapMetadata
+    )
+
+    kopf.adopt(wgClientConfigMapObject)
+
+    try:
+        v1API.create_namespaced_config_map(namespace=namespace,body=wgClientConfigMapObject)
+    except client.exceptions.ApiException as e:
+        logger.error("Could not create server wireguard configuration configMap")
+        raise kopf.PermanentError(e.reason)
     
+
+    logger.info("Client WireGuard configuration is generated to ConfigMap zg-wg-client-{0}".format(name))
+
+    
+    
+
 
 
 
