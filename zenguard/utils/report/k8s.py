@@ -38,3 +38,16 @@ def getLoadBalancerIP(loadBalancerName: str,namespace: str) -> Union[str,dict]:
         return {"ErrorCode":'600',"ErrorMsg": "Can not read loadbalancer {0} , reason {1}".format(loadBalancerName,e.reason)}
     
     return str(lb.status.load_balancer.ingress[0].ip)
+
+def getDeploymentObject(deploymentName: str,namespace: str)->Union[dict,client.V1Deployment]:
+    appsV1 = client.AppsV1Api()
+
+    try:
+        deployment = appsV1.read_namespaced_deployment(
+            name=deploymentName,
+            namespace=namespace
+        )
+       
+        return deployment
+    except client.exceptions.ApiException as e:
+        return {"ErrorCode":'600',"ErrorMsg": "Can not read deployment {0} , reason {1}".format(deploymentName,e.reason)}
