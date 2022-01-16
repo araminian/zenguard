@@ -1,6 +1,5 @@
 
 from re import template
-from tkinter.font import names
 from kopf._core.actions.execution import no_extra_context
 from kubernetes.client.models.v1_capabilities import V1Capabilities
 from kubernetes.client.models.v1_config_map_volume_source import V1ConfigMapVolumeSource
@@ -641,7 +640,7 @@ def create_wgclient_fn(spec, name, namespace, logger, **kwargs):
         raise kopf.TemporaryError(serverKeys['ErrorMsg'])
 
     ## Server Public IP Address
-    if ( serverConfigs['serviceType' == 'LoadBalancer']):
+    if ( serverConfigs['serviceType'] == 'LoadBalancer'):
         serverPublicIP = getLoadBalancerIP(
             loadBalancerName="zg-wg-{0}".format(network),
             namespace=namespace
@@ -686,7 +685,8 @@ def create_wgclient_fn(spec, name, namespace, logger, **kwargs):
     clientInfoWGClient = {
         'name': name,
         'privateKey': clientKeys[0],
-        'IPAddress': requestedIP
+        'IPAddress': requestedIP,
+        'routes': clientRoute
     }
 
     clientsInfoWGServer = getClients(networkNamespace)
@@ -711,7 +711,7 @@ def create_wgclient_fn(spec, name, namespace, logger, **kwargs):
     v1API = client.CoreV1Api()
     wgServerConfigMapMetadata = client.V1ObjectMeta(
         namespace=namespace,
-        name = "zg-wg-{0}-{1}".format(name,updateWGRevition),
+        name = "zg-wg-{0}-{1}".format(network,updateWGRevition),
         labels={
             'manager': 'zenguard',
             'network': name,
@@ -748,7 +748,7 @@ def create_wgclient_fn(spec, name, namespace, logger, **kwargs):
     wgClientConfigPath = "{0}/wg-{1}.conf".format(wgConfigTempDir.name,name)
     if not Path(wgClientConfigPath).is_file():
         raise kopf.PermanentError("Client WireGuard configuration file could not be generated")
-    wgClientConfig = open(wgServerConfigPath, "r")
+    wgClientConfig = open(wgClientConfigPath, "r")
 
     ### Generate client WG ConfigMap
 
@@ -790,7 +790,7 @@ def create_wgclient_fn(spec, name, namespace, logger, **kwargs):
 
         raise kopf.PermanentError("Could not get server deployment")
     
-    serverDeployment.spec.template.spec.volumes[0].config_map.name = "zg-wg-{0}-{1}".format(name,updateWGRevition)
+    serverDeployment.spec.template.spec.volumes[0].config_map.name = "zg-wg-{0}-{1}".format(network,updateWGRevition)
 
     patchResult = patchDeployment(
         deploymentName="zg-{0}-server".format(network),
