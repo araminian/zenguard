@@ -10,6 +10,6 @@ def deleteConfigMap(name:str,namespace:str) -> Union[bool,dict]:
         )
         
     except client.exceptions.ApiException as e:
-        return {"ErrorCode":'600',"ErrorMsg": "Can not delete configMap {0} , reason {1}".format(name,e.reason)}
+        return {"ErrorCode":'602',"ErrorMsg": "Can not delete configMap {0} , reason {1}".format(name,e.reason)}
     
     return True
