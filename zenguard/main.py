@@ -801,22 +801,10 @@ def create_wgclient_fn(spec, name, namespace, logger, **kwargs):
     if (type(patchResult) == dict and "ErrorCode" in patchResult):
         raise kopf.PermanentError("Could not update server deployment to use new WireGuard configuartion")
     
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-@kopf.on.delete('wwgnetworks.zenguard.io')
+@kopf.on.delete('wgnetworks.zenguard.io')
 def delete_network_fn(spec, name, namespace, logger, **kwargs):
+
+    # -------------------- Delete Network DB and Init entry ---------------------------
     network = "{0}-{1}".format(name,namespace)
     deleteResult = removeNetwork(Network=network)
 
@@ -829,6 +817,28 @@ def delete_network_fn(spec, name, namespace, logger, **kwargs):
     
     if(deleteResult == True):
         logger.info("The network '{0}' is removed".format(name))
+
+    # ------------------- Delete WireGuard Configuration ConfigMaps --------------------
+
+    from zenguard.utils.k8s.find import findConfgMapByLabel
+    from zenguard.utils.k8s.delete import deleteConfigMap
+
+    label_selector = "manager=zenguard,network={0},type=wgConfig,usedBy=server".format(name)
+
+    configMapsDict = findConfgMapByLabel(
+        namespace=namespace,
+        label_selector=label_selector
+    )
+
+    if ("ErrorCode" in configMapsDict):
+        logger.error(configMapsDict['ErrorMsg'])
+        return
+    
+    for cmName,cmObject in configMapsDict.items():
+        cmDeleteResult = deleteConfigMap(name=cmName,namespace=namespace)
+        if (type(cmDeleteResult) == dict):
+            logger.error(cmDeleteResult['ErrorMsg'])
+
 
 
 @kopf.on.create('networks.tracerip.io')
