@@ -839,6 +839,143 @@ def delete_network_fn(spec, name, namespace, logger, **kwargs):
         if (type(cmDeleteResult) == dict):
             logger.error(cmDeleteResult['ErrorMsg'])
 
+@kopf.on.delete('wgclients.zenguard.io')
+def delete_network_fn(spec, name, namespace, logger, **kwargs):
+
+    network = spec.get('network')
+    networkNamespace = "{0}-{1}".format(network,namespace)
+
+
+    # --------------------- Release IP and Remove Client from DB -----------------------
+
+    releaseResult = returnIP(Network=networkNamespace,clientName=name)
+
+    if(type(releaseResult) == dict and 'ErrorMsg' in releaseResult):
+        
+        logger.error(releaseResult['ErrorMsg'])
+        raise kopf.PermanentError("can't be deleted")
+    
+    if(releaseResult != True):
+        raise kopf.PermanentError("Can't be deleted")
+
+
+    clientID = get_sha2(name)
+    findClientQuery = {"_id": clientID}
+    deleteResult = delete_abstract_one(database_name=networkNamespace,table_name='clients',query=findClientQuery)
+    
+    if (type(deleteResult) == dict):
+        raise kopf.PermanentError("Can not delete client from the database")
+
+    # --------------------- Read zg-serverconfigs-[net] configmap ----------------------
+    serverConfigs = readConfigMap(
+        configMapName="zg-serverconfigs-{0}".format(network),
+        namespace=namespace
+    )
+
+    if ('ErrorCode' in serverConfigs):
+        raise kopf.TemporaryError("Can not read zg-serverconfigs-{0} ConfigMap".format(network))
+    
+    # -------------------- Create Server and Subnet dicts for generate WG configs ---------------------------------
+
+    ## Read Server Secret
+    serverKeys = readSecret(
+        secretName="zg-serverkeys-{0}".format(network),
+        namespace=namespace
+    )
+
+    if ('ErrorCode' in serverKeys):
+        raise kopf.TemporaryError(serverKeys['ErrorMsg'])
+
+    ## ServerInfo for generating server wg config
+    serverInfoWGServer = {
+        'IPAddress': serverConfigs['IPAddress'],
+        'port': serverConfigs['port'],
+        'privateKey': serverKeys['privateKey']
+    }
+
+    ## SubnetInfo
+    subnet = {}
+    subnet['mask'] = str(IPNetwork(serverConfigs['CIDR']).netmask)
+
+    # -------------------- Client Information for generationg Server wg configs -------------------
+
+    clientsInfoWGServer = getClients(networkNamespace)
+    if(type(clientsInfoWGServer) == dict and 'ErrorMsg' in clientsInfoWGServer):
+        raise kopf.PermanentError(clientsInfoWGServer['ErrorMsg'])
+    
+    # ------------------------ Generate WG Configs --------------------------------------
+
+    wgRevision = int(serverConfigs['wgRevision'])
+    updateWGRevition = wgRevision + 1
+
+    wgConfigTempDir = tempfile.TemporaryDirectory(dir="/tmp")
+
+    ## Generate Server WG Configs
+    serverGenerate(clients=clientsInfoWGServer,server=serverInfoWGServer,subnet=subnet,outputDir=wgConfigTempDir.name,networkName=network)
+    wgServerConfigPath = "{0}/wg-server.conf".format(wgConfigTempDir.name)
+    if not Path(wgServerConfigPath).is_file():
+        raise kopf.PermanentError("Server WireGuard configuration file could not be generated")
+    wgServerConfig = open(wgServerConfigPath, "r")
+
+    ## Generate Server WG Config ConfigMap
+    v1API = client.CoreV1Api()
+    wgServerConfigMapMetadata = client.V1ObjectMeta(
+        namespace=namespace,
+        name = "zg-wg-{0}-{1}".format(network,updateWGRevition),
+        labels={
+            'manager': 'zenguard',
+            'network': name,
+            'type': 'wgConfig',
+            'usedBy': 'server',
+            'version': str(updateWGRevition)
+        }
+    )
+    wgServerConfigurationData = {'wg0.conf': wgServerConfig.read() }
+    wgServerConfigMapObject = client.V1ConfigMap(
+        api_version='v1',kind='ConfigMap',data=wgServerConfigurationData,metadata=wgServerConfigMapMetadata
+    )
+
+    try:
+        serverConfigMapManifest = v1API.create_namespaced_config_map(namespace=namespace,body=wgServerConfigMapObject)
+    except client.exceptions.ApiException as e:
+        logger.error("Could not create server wireguard configuration configMap")
+        raise kopf.PermanentError(e.reason)
+    
+    ## Update Server ConfigMaps
+    serverConfigs['wgRevision'] = str(updateWGRevition)
+    serverConfigPatchResult = patchConfigMap(
+        configMapName="zg-serverconfigs-{0}".format(network),
+        namespace=namespace,
+        newData=serverConfigs
+    )
+    if(type(serverConfigPatchResult) == dict):
+        raise kopf.PermanentError(serverConfigPatchResult['ErrorMsg'])
+    
+
+    # ------------------- Update Server Deployment ---------------------------------
+
+    serverDeployment = getDeploymentObject(
+        deploymentName="zg-{0}-server".format(network),
+        namespace=namespace
+    )
+
+    if(type(serverDeployment) == dict and 'ErrorCode' in serverDeployment):
+
+        raise kopf.PermanentError("Could not get server deployment")
+    
+    serverDeployment.spec.template.spec.volumes[0].config_map.name = "zg-wg-{0}-{1}".format(network,updateWGRevition)
+
+    patchResult = patchDeployment(
+        deploymentName="zg-{0}-server".format(network),
+        namespace=namespace,
+        newBody=serverDeployment
+    )
+
+    if (type(patchResult) == dict and "ErrorCode" in patchResult):
+        raise kopf.PermanentError("Could not update server deployment to use new WireGuard configuartion")
+
+
+
 @kopf.on.delete('ips.tracerip.io')
 def delete_ip_fn(spec, name, namespace, logger, **kwargs):
 
